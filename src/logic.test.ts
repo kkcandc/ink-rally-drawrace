@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { hazardX } from './hazards'
 import { analyze, decodeMask, encodeMask, RIVALS, scribble } from './ink'
 import { aiInput, createRace, progressOf, stepSim } from './sim'
-import { getTrack, rightContinuity, TRACKS, trackCrosses } from './tracks'
+import { frameAt, getTrack, rightContinuity, TRACKS, trackCrosses } from './tracks'
 
 describe('share codes', () => {
   it('round-trips masks and colors', () => {
@@ -59,7 +60,79 @@ describe('tracks', () => {
       expect(rightContinuity(track)).toBeGreaterThan(0.9)
       const pads = new Set(track.samples.map((s) => s.pad).filter(Boolean))
       expect(pads.size).toBeGreaterThanOrEqual(3)
+      const kinds = new Set(track.hazards.map((h) => h.kind))
+      expect(kinds.has('slick')).toBe(true)
+      expect(kinds.has('sticky')).toBe(true)
+      expect(kinds.has('cone')).toBe(true)
+      expect(kinds.has('sweeper')).toBe(true)
+      expect(track.hazards.length).toBeGreaterThanOrEqual(8)
+      for (const h of track.hazards) {
+        const frame = frameAt(track, h.s)
+        const half = frame.width * 0.5
+        if (h.kind === 'sweeper') {
+          expect(h.amp + h.lateral).toBeLessThan(half - 1.2)
+        } else {
+          expect(Math.abs(h.x) - h.lateral).toBeGreaterThan(0.7)
+          expect(Math.abs(h.x) + h.lateral).toBeLessThan(half - 0.2)
+        }
+        expect(h.name.length).toBeGreaterThan(3)
+      }
     }
+  })
+
+  it('spins and slows a sled that drives through an ink slick', () => {
+    const track = getTrack('quill')
+    const slick = track.hazards.find((h) => h.kind === 'slick')
+    expect(slick).toBeTruthy()
+    const stats = analyze(RIVALS[0].mask)
+    const sim = createRace({
+      track,
+      laps: 2,
+      skipCountdown: true,
+      rubber: false,
+      specs: [{ id: 'p', name: 'Driver', color: '#147a86', stats, isPlayer: true }],
+    })
+    const player = sim.racers[0]
+    player.s = slick!.s - slick!.along - 1
+    player.x = hazardX(slick!, 0)
+    player.v = 30
+    player.crossedOnce = true
+    let spun = false
+    let slowed = false
+    for (let i = 0; i < 80; i++) {
+      stepSim(sim, 1 / 60, () => ({ steer: 0, brake: 0, drift: false, boost: false }))
+      if (Math.abs(player.heading) > 0.4) spun = true
+      if (player.v < 22) slowed = true
+    }
+    expect(sim.events.some((e) => e.type === 'hazard' && e.kind === 'slick')).toBe(true)
+    expect(spun).toBe(true)
+    expect(slowed).toBe(true)
+  })
+
+  it('glues a sled that sits in a sticky blot', () => {
+    const track = getTrack('blotter')
+    const blot = track.hazards.find((h) => h.kind === 'sticky')
+    expect(blot).toBeTruthy()
+    const stats = analyze(RIVALS[1].mask)
+    const sim = createRace({
+      track,
+      laps: 2,
+      skipCountdown: true,
+      rubber: false,
+      specs: [{ id: 'p', name: 'Driver', color: '#c9841a', stats, isPlayer: true }],
+    })
+    const player = sim.racers[0]
+    player.s = blot!.s
+    player.x = blot!.x
+    player.v = 28
+    player.crossedOnce = true
+    for (let i = 0; i < 40; i++) {
+      player.s = blot!.s
+      player.x = blot!.x
+      stepSim(sim, 1 / 60, () => ({ steer: 0, brake: 0, drift: false, boost: false }))
+    }
+    expect(sim.events.some((e) => e.type === 'hazard' && e.kind === 'sticky')).toBe(true)
+    expect(player.v).toBeLessThan(14)
   })
 })
 

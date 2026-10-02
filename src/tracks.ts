@@ -1,4 +1,5 @@
 import { clamp, wrapPi } from './format'
+import { placeHazards, type Hazard } from './hazards'
 
 export type Vec3 = { x: number; y: number; z: number }
 
@@ -29,6 +30,7 @@ export type BuiltTrack = {
   length: number
   spacing: number
   samples: Sample[]
+  hazards: Hazard[]
 }
 
 export type Frame = {
@@ -218,7 +220,8 @@ function bake(id: string, name: string, tagline: string, ctrl: Ctrl[]): BuiltTra
     s.width = 14.5 + sharp * 5.5
   }
   markPads(raw, step)
-  return { id, name, tagline, length: sampled.length, spacing: step, samples: raw }
+  const hazards = placeHazards(raw, step)
+  return { id, name, tagline, length: sampled.length, spacing: step, samples: raw, hazards }
 }
 
 function markPads(samples: Sample[], spacing: number) {
@@ -276,8 +279,8 @@ function loop(opts: {
 export const TRACKS: BuiltTrack[] = [
   bake(
     'quill',
-    'Quill Circuit',
-    'A wide first page. Learn the ink before it learns you.',
+    'Pop Shuvit',
+    'Wide opener. Learn the line before the stands learn your name.',
     loop({
       rx: 168,
       rz: 102,
@@ -287,8 +290,8 @@ export const TRACKS: BuiltTrack[] = [
   ),
   bake(
     'blotter',
-    'Blotter Bend',
-    'The corners blot. Drift, or wear the curb.',
+    'Curb Check',
+    'The apex is a trap. Drift it, or the rail checks you.',
     loop({
       rx: 142,
       rz: 118,
@@ -301,8 +304,8 @@ export const TRACKS: BuiltTrack[] = [
   ),
   bake(
     'margin',
-    'Margin Marathon',
-    'Long paper, tall hills, boosts like dropped punctuation.',
+    'Hill Bomb',
+    'Long paper, tall drops, SEND pads like exclamation points.',
     loop({
       rx: 228,
       rz: 146,

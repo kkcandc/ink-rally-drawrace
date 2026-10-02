@@ -1,4 +1,5 @@
 import { clamp } from './format'
+import { hazardX, type HazardKind } from './hazards'
 import type { RuntimeStats } from './ink'
 import { TUNE } from './tune'
 import { frameAt, type BuiltTrack } from './tracks'
@@ -38,6 +39,7 @@ export type SimEvent =
   | { type: 'hit' }
   | { type: 'boost' }
   | { type: 'drift' }
+  | { type: 'hazard'; kind: HazardKind; name: string }
 
 export type SimRacer = {
   id: string
@@ -72,6 +74,10 @@ export type SimRacer = {
   hot: boolean
   draft: number
   announcedFinish: boolean
+  tumble: number
+  spinRate: number
+  hazardId: number
+  sticky: boolean
 }
 
 export type Sim = {
@@ -132,6 +138,10 @@ export function createRace(opts: {
       hot: false,
       draft: 0,
       announcedFinish: false,
+      tumble: 0,
+      spinRate: 0,
+      hazardId: 0,
+      sticky: false,
     }
   })
   return {
@@ -195,6 +205,7 @@ export function aiInput(sim: Sim, r: SimRacer): Input {
   const safe = cornerSafeSpeed(sim.track, r.s, r.stats.gripCoef) * (0.98 + r.ai.aggression * 0.1)
   const brake = r.v > safe ? clamp((r.v - safe) / 7.5, 0, 1) : 0
   const upcoming = Math.abs(look.curv)
+  steer = avoidHazards(sim, r, steer)
   const drift =
     brake < 0.35 &&
     upcoming > 0.018 &&
@@ -248,6 +259,73 @@ function separate(sim: Sim) {
       }
     }
   }
+}
+
+function avoidHazards(sim: Sim, r: SimRacer, steer: number): number {
+  let nudge = 0
+  const length = sim.track.length
+  const look = Math.max(18, r.v * 0.62)
+  for (const h of sim.track.hazards) {
+    const ahead = signedDelta(h.s, r.s, length)
+    if (ahead < -2 || ahead > look) continue
+    const tHit = sim.time + ahead / Math.max(10, r.v)
+    const hx = hazardX(h, tHit)
+    const gap = r.x - hx
+    const need = h.lateral + 1.85
+    if (Math.abs(gap) > need) continue
+    const urgency = 1 - Math.max(0, ahead) / look
+    const side = gap === 0 ? (h.phase > 1 ? 1 : -1) : Math.sign(gap)
+    nudge += side * (0.7 + urgency * 0.9)
+  }
+  if (!nudge) return steer
+  return clamp(steer + clamp(nudge, -1.15, 1.15), -1, 1)
+}
+
+function applyHazards(sim: Sim, r: SimRacer, dt: number) {
+  if (r.finished || r.isGhost) return
+  let hit: (typeof sim.track.hazards)[number] | null = null
+  for (const h of sim.track.hazards) {
+    const ds = signedDelta(h.s, r.s, sim.track.length)
+    if (Math.abs(ds) > h.along) continue
+    const hx = hazardX(h, sim.time)
+    if (Math.abs(r.x - hx) > h.lateral) continue
+    hit = h
+    break
+  }
+  if (!hit) {
+    r.hazardId = 0
+    r.sticky = false
+    return
+  }
+  if (hit.kind === 'sticky') {
+    r.sticky = true
+    r.v += (8 - r.v) * Math.min(1, dt * 4.2)
+    r.vx *= Math.exp(-3.4 * dt)
+  } else r.sticky = false
+  if (r.hazardId === hit.id) return
+  r.hazardId = hit.id
+  const hx = hazardX(hit, sim.time)
+  const dir = Math.sign(r.x - hx || r.vx || 1)
+  if (hit.kind === 'slick') {
+    r.spinRate = dir * 3.5
+    r.tumble = 0.78
+    r.heading = dir * 0.95
+    r.v *= 0.6
+    r.vx += dir * 4.5
+  } else if (hit.kind === 'cone') {
+    r.vx = dir * Math.max(7, Math.abs(r.vx) + 4)
+    r.v *= 0.68
+    r.heading = dir * 0.5
+    r.spinRate = dir * 1.6
+    r.tumble = 0.32
+  } else if (hit.kind === 'sweeper') {
+    r.vx = dir * 9
+    r.v *= 0.52
+    r.heading = dir * 0.8
+    r.spinRate = dir * 2.8
+    r.tumble = 0.55
+  }
+  if (r.isPlayer) sim.events.push({ type: 'hazard', kind: hit.kind, name: hit.name })
 }
 
 function wrapProgress(r: SimRacer, sim: Sim, prevS: number) {
@@ -312,12 +390,18 @@ function stepRacer(sim: Sim, r: SimRacer, dt: number, input: Input) {
     (input.drift || (input.brake > 0.55 && Math.abs(steer) > 0.45))
   const wantBoost = !r.finished && input.boost && r.boost > 0.04
 
-  const steerRate = TUNE.headingSteer * (0.82 + r.stats.gripCoef * 0.22)
-  if (!r.finished) r.heading += steer * steerRate * dt
-  const maxH = wantDrift ? TUNE.maxDriftHeading : TUNE.maxHeading
-  r.heading = clamp(r.heading, -maxH, maxH)
-  const align = wantDrift ? TUNE.driftAlign : TUNE.align + r.stats.gripCoef * 1.1
-  r.heading *= Math.exp(-align * dt)
+  if (r.tumble > 0) {
+    r.heading += r.spinRate * dt
+    r.tumble -= dt
+    r.heading = clamp(r.heading, -1.35, 1.35)
+  } else {
+    const steerRate = TUNE.headingSteer * (0.82 + r.stats.gripCoef * 0.22)
+    if (!r.finished) r.heading += steer * steerRate * dt
+    const maxH = wantDrift ? TUNE.maxDriftHeading : TUNE.maxHeading
+    r.heading = clamp(r.heading, -maxH, maxH)
+    const align = wantDrift ? TUNE.driftAlign : TUNE.align + r.stats.gripCoef * 1.1
+    r.heading *= Math.exp(-align * dt)
+  }
 
   let target = r.stats.topSpeed * (r.ai ? 0.94 + r.ai.skill * 0.08 : 1)
   if (wantBoost) target *= TUNE.boostMul
@@ -385,6 +469,7 @@ function stepRacer(sim: Sim, r: SimRacer, dt: number, input: Input) {
   const prevS = r.s
   if (!r.finished) r.s += r.v * Math.cos(r.heading) * dt
   wrapProgress(r, sim, prevS)
+  applyHazards(sim, r, dt)
 
   const sliding = Math.abs(r.heading) > 0.26 && Math.abs(r.vx) > 0.7 && r.v > 8
   r.drifting = wantDrift && sliding
