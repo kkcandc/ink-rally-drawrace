@@ -57,6 +57,8 @@ export class RaceView {
   private skidMat: THREE.MeshBasicMaterial
   private lamps: THREE.Mesh[] = []
   private padMats: THREE.MeshBasicMaterial[] = []
+  private padSigns: THREE.Sprite[] = []
+  private signTex: THREE.CanvasTexture | null = null
   private sun: THREE.DirectionalLight
   private sunTarget = new THREE.Object3D()
   private reduced: boolean
@@ -325,6 +327,8 @@ export class RaceView {
   private pads(track: BuiltTrack): THREE.Group {
     const group = new THREE.Group()
     const n = track.samples.length
+    const signTex = this.inkSignTexture()
+    const beacon = new THREE.SphereGeometry(0.62, 12, 10)
     let i = 0
     while (i < n) {
       const id = track.samples[i].pad
@@ -335,11 +339,14 @@ export class RaceView {
       let j = i
       while (j < n && track.samples[j].pad === id) j++
       const positions: number[] = []
+      const colors: number[] = []
       const indices: number[] = []
-      const lift = 0.22
+      const lift = 0.28
+      const lime = new THREE.Color('#d6ff3a')
+      const ink = new THREE.Color('#16130f')
       for (let k = i; k < j; k++) {
         const s = track.samples[k]
-        const half = s.width * 0.36
+        const half = s.width * 0.38
         positions.push(
           s.x - s.rx * half,
           s.y - s.ry * half + s.uy * lift,
@@ -348,6 +355,8 @@ export class RaceView {
           s.y + s.ry * half + s.uy * lift,
           s.z + s.rz * half,
         )
+        const stripe = Math.floor(s.s / 2.2) % 2 === 0 ? lime : ink
+        colors.push(stripe.r, stripe.g, stripe.b, stripe.r, stripe.g, stripe.b)
       }
       const count = j - i
       for (let k = 0; k < count - 1; k++) {
@@ -358,35 +367,75 @@ export class RaceView {
       if (positions.length > 3) {
         const geo = new THREE.BufferGeometry()
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
         geo.setIndex(indices)
         geo.computeVertexNormals()
         const mat = new THREE.MeshBasicMaterial({
-          color: '#d6f25c',
+          vertexColors: true,
           side: THREE.DoubleSide,
           polygonOffset: true,
           polygonOffsetFactor: -2,
           polygonOffsetUnits: -2,
         })
-        this.padMats.push(mat)
         group.add(new THREE.Mesh(geo, mat))
-        group.add(this.inkGate(track.samples[i], mat))
+        const glow = new THREE.MeshBasicMaterial({ color: '#d6ff3a', fog: false })
+        this.padMats.push(glow)
+        group.add(this.inkGate(track.samples[i], glow))
+        for (let k = i; k < j; k += 2) {
+          const s = track.samples[k]
+          const ball = new THREE.Mesh(beacon, glow)
+          ball.position.set(s.x, s.y + s.uy * 1.35, s.z)
+          group.add(ball)
+        }
+        const s0 = track.samples[i]
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: signTex, fog: false, transparent: true }))
+        sprite.position.set(s0.x + s0.ux * 4.6, s0.y + s0.uy * 4.6, s0.z + s0.uz * 4.6)
+        sprite.scale.set(8.4, 4.2, 1)
+        this.padSigns.push(sprite)
+        group.add(sprite)
       }
       i = j
     }
     return group
   }
 
+  private inkSignTexture(): THREE.CanvasTexture {
+    if (this.signTex) return this.signTex
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 128
+    const g = canvas.getContext('2d')
+    if (!g) {
+      this.signTex = new THREE.CanvasTexture(canvas)
+      return this.signTex
+    }
+    g.fillStyle = '#14110e'
+    g.fillRect(0, 0, 256, 128)
+    g.strokeStyle = '#d6ff3a'
+    g.lineWidth = 12
+    g.strokeRect(8, 8, 240, 112)
+    g.fillStyle = '#d6ff3a'
+    g.font = '700 78px sans-serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('INK', 128, 70)
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    this.signTex = tex
+    return tex
+  }
+
   private inkGate(s: BuiltTrack['samples'][number], mat: THREE.Material): THREE.Group {
     const gate = new THREE.Group()
     const half = Math.max(2.4, s.width * 0.48)
-    const postH = 2.7
+    const postH = 5.4
     const basis = new THREE.Matrix4().makeBasis(
       new THREE.Vector3(s.rx, s.ry, s.rz),
       new THREE.Vector3(s.ux, s.uy, s.uz),
       new THREE.Vector3(s.tx, s.ty, s.tz),
     )
     const quat = new THREE.Quaternion().setFromRotationMatrix(basis)
-    const post = new THREE.BoxGeometry(0.46, postH, 0.46)
+    const post = new THREE.BoxGeometry(0.7, postH, 0.7)
     for (const side of [-1, 1]) {
       const mesh = new THREE.Mesh(post, mat)
       mesh.quaternion.copy(quat)
@@ -397,7 +446,7 @@ export class RaceView {
       )
       gate.add(mesh)
     }
-    const lintel = new THREE.Mesh(new THREE.BoxGeometry(half * 2, 0.4, 0.46), mat)
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(half * 2, 0.62, 0.7), mat)
     lintel.quaternion.copy(quat)
     lintel.position.set(s.x + s.ux * postH, s.y + s.uy * postH, s.z + s.uz * postH)
     gate.add(lintel)
@@ -617,10 +666,9 @@ export class RaceView {
     }
     const c = this.sim.countdown
     const lit = !this.sim.started ? (c > 2 ? 0 : c > 1 ? 1 : c > 0 ? 2 : 3) : 3
-    const pulse = 0.72 + Math.sin(this.sim.time * 7) * 0.28
-    for (const mat of this.padMats) {
-      mat.color.setRGB((0.84 * pulse), (0.95 * pulse), (0.36 * pulse))
-    }
+    const pulse = 0.82 + Math.sin(this.sim.time * 7) * 0.18
+    for (const mat of this.padMats) mat.color.setRGB(0.84 * pulse, 1 * pulse, 0.23 * pulse)
+    for (const sign of this.padSigns) sign.scale.set(8.4 * pulse, 4.2 * pulse, 1)
     this.lamps.forEach((lamp, i) => {
       const mat = lamp.material as THREE.MeshStandardMaterial
       const on = this.sim.started ? true : i < lit
@@ -694,22 +742,19 @@ export class RaceView {
     ctx.strokeStyle = 'rgba(243,234,215,0.85)'
     ctx.lineWidth = 3
     ctx.stroke()
-    ctx.strokeStyle = '#d6f25c'
-    ctx.lineWidth = 5
-    ctx.beginPath()
-    let inking = false
-    samples.forEach((s) => {
-      if (!s.pad) {
-        inking = false
-        return
-      }
+    const seen = new Set<number>()
+    for (const s of samples) {
+      if (!s.pad || seen.has(s.pad)) continue
+      seen.add(s.pad)
       const p = project(s.x, s.z)
-      if (!inking) {
-        ctx.moveTo(p.x, p.y)
-        inking = true
-      } else ctx.lineTo(p.x, p.y)
-    })
-    ctx.stroke()
+      ctx.beginPath()
+      ctx.fillStyle = '#d6ff3a'
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.lineWidth = 1.5
+      ctx.strokeStyle = '#14110e'
+      ctx.stroke()
+    }
     for (const r of this.sim.racers) {
       const f = frameAt(this.sim.track, r.s, r.x)
       const p = project(f.x, f.z)

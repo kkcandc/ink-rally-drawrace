@@ -226,7 +226,7 @@ function markPads(samples: Sample[], spacing: number) {
   const gap = Math.max(8, Math.round(150 / spacing))
   const padLen = Math.max(6, Math.round(16 / spacing))
   let pad = 1
-  for (let cursor = Math.round(50 / spacing); cursor < n - padLen && pad <= 8; cursor += gap) {
+  for (let cursor = Math.round(18 / spacing); cursor < n - padLen && pad <= 8; cursor += gap) {
     let best = cursor
     let bestScore = Infinity
     const search = Math.round(36 / spacing)
