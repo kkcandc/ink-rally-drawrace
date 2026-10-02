@@ -223,23 +223,30 @@ function bake(id: string, name: string, tagline: string, ctrl: Ctrl[]): BuiltTra
 
 function markPads(samples: Sample[], spacing: number) {
   const n = samples.length
-  const low = samples.map((s) => Math.abs(s.curv) < 0.011)
-  const seen = new Uint8Array(n)
+  const gap = Math.max(8, Math.round(150 / spacing))
+  const padLen = Math.max(6, Math.round(16 / spacing))
   let pad = 1
-  for (let i = 0; i < n; i++) {
-    if (!low[i] || seen[i]) continue
-    let len = 0
-    while (low[(i + len) % n] && len < n) {
-      seen[(i + len) % n] = 1
-      len++
+  for (let cursor = Math.round(50 / spacing); cursor < n - padLen && pad <= 8; cursor += gap) {
+    let best = cursor
+    let bestScore = Infinity
+    const search = Math.round(36 / spacing)
+    const from = Math.max(0, cursor - search)
+    const to = Math.min(n - padLen, cursor + search)
+    for (let i = from; i < to; i++) {
+      let score = 0
+      let blocked = false
+      for (let k = 0; k < padLen; k++) {
+        if (samples[i + k].pad) blocked = true
+        score += Math.abs(samples[i + k].curv)
+      }
+      if (!blocked && score < bestScore) {
+        bestScore = score
+        best = i
+      }
     }
-    const meters = len * spacing
-    if (meters < 42) continue
-    const padLen = Math.min(len - 4, Math.round(18 / spacing))
-    const start = Math.floor((len - padLen) / 2)
-    for (let k = 0; k < padLen; k++) samples[(i + start + k) % n].pad = pad
+    if (!Number.isFinite(bestScore)) continue
+    for (let k = 0; k < padLen; k++) samples[best + k].pad = pad
     pad++
-    if (pad > 6) break
   }
 }
 

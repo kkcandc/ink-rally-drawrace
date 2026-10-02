@@ -58,7 +58,7 @@ describe('tracks', () => {
       expect(trackCrosses(track)).toBe(false)
       expect(rightContinuity(track)).toBeGreaterThan(0.9)
       const pads = new Set(track.samples.map((s) => s.pad).filter(Boolean))
-      expect(pads.size).toBeGreaterThan(0)
+      expect(pads.size).toBeGreaterThanOrEqual(3)
     }
   })
 })
