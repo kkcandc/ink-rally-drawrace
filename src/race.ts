@@ -13,7 +13,9 @@ import {
   type SimEvent,
   type SimRacer,
 } from './sim'
+import { hazardX, type HazardKind } from './hazards'
 import { frameAt, type BuiltTrack } from './tracks'
+import { addHazardActors, addStands, syncHazards, type HazardActor } from './world'
 
 export type HudSnap = {
   place: number
@@ -67,6 +69,8 @@ export class RaceView {
   private minimap: HTMLCanvasElement | null = null
   private minimapCtx: CanvasRenderingContext2D | null = null
   private fx: HTMLElement | null
+  private hazards: HazardActor[] = []
+  private fxTimer = 0
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -153,7 +157,7 @@ export class RaceView {
     this.disposed = true
     cancelAnimationFrame(this.raf)
     window.removeEventListener('resize', this.onResize)
-    this.fx?.classList.remove('boost', 'hit')
+    this.fx?.classList.remove('boost', 'hit', 'slick', 'sticky', 'cone', 'sweeper')
     disposeObject(this.scene)
     this.renderer.dispose()
   }
@@ -227,6 +231,8 @@ export class RaceView {
     this.scene.add(this.pads(track))
     this.scene.add(this.finish(track))
     this.lamps = this.gantry(track)
+    addStands(this.scene, track)
+    this.hazards = addHazardActors(this.scene, track)
     for (let i = 0; i < 18; i++) {
       const mote = new THREE.Mesh(
         new THREE.SphereGeometry(1.2 + (i % 4) * 0.4, 8, 8),
@@ -418,7 +424,7 @@ export class RaceView {
     g.font = '700 78px sans-serif'
     g.textAlign = 'center'
     g.textBaseline = 'middle'
-    g.fillText('INK', 128, 70)
+    g.fillText('SEND', 128, 70)
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
     this.signTex = tex
@@ -517,10 +523,15 @@ export class RaceView {
     const before = this.sim.events.length
     if (!this.celebrating) stepSim(this.sim, dt, () => this.opts.getInput())
     if (this.sim.events.length > before) {
-      for (let i = before; i < this.sim.events.length; i++) this.opts.onEvent(this.sim.events[i])
+      for (let i = before; i < this.sim.events.length; i++) {
+        const event = this.sim.events[i]
+        this.opts.onEvent(event)
+        if (event.type === 'hazard') this.burstHazard(event.kind)
+      }
     }
     this.sim.events.length = 0
     this.poseCars(dt)
+    syncHazards(this.hazards, this.sim.track, this.sim.time, dt)
     this.cameraFrame(dt)
     this.dress(dt)
     this.opts.onHud(this.hud())
@@ -572,6 +583,29 @@ export class RaceView {
     slot.mesh.rotateY(r.heading)
     const mat = slot.mesh.material as THREE.MeshBasicMaterial
     mat.opacity = 0.45
+  }
+
+  private burstHazard(kind: HazardKind) {
+    const target = this.sim.racers.find((r) => r.isPlayer) ?? this.focusRacer()
+    if (!target) return
+    const f = frameAt(this.sim.track, target.s, target.x)
+    const color = kind === 'slick' ? '#c9b6ff' : kind === 'sticky' ? '#ff9a4a' : kind === 'cone' ? '#ef4b32' : '#d6f25c'
+    for (let i = 0; i < 8; i++) {
+      const slot = this.puffs.find((p) => p.life <= 0)
+      if (!slot) break
+      slot.life = slot.max = 0.55
+      slot.mesh.visible = true
+      slot.mesh.position.set(f.x + (Math.random() - 0.5) * 2.4, f.y + 0.4 + Math.random() * 0.8, f.z + (Math.random() - 0.5) * 2.4)
+      slot.mesh.scale.setScalar(0.35 + Math.random() * 0.35)
+      const mat = slot.mesh.material as THREE.MeshBasicMaterial
+      mat.color.set(color)
+      mat.opacity = 0.85
+    }
+    if (!this.reduced) this.shake = Math.min(0.6, this.shake + 0.32)
+    this.fx?.classList.remove('slick', 'sticky', 'cone', 'sweeper')
+    this.fx?.classList.add(kind)
+    window.clearTimeout(this.fxTimer)
+    this.fxTimer = window.setTimeout(() => this.fx?.classList.remove(kind), 460)
   }
 
   private puffAt(f: ReturnType<typeof frameAt>, r: SimRacer) {
@@ -742,6 +776,14 @@ export class RaceView {
     ctx.strokeStyle = 'rgba(243,234,215,0.85)'
     ctx.lineWidth = 3
     ctx.stroke()
+    for (const h of this.sim.track.hazards) {
+      const f = frameAt(this.sim.track, h.s, hazardX(h, this.sim.time))
+      const p = project(f.x, f.z)
+      ctx.beginPath()
+      ctx.fillStyle = h.kind === 'slick' ? '#b388ff' : h.kind === 'sticky' ? '#ff8a3d' : h.kind === 'cone' ? '#ef4b32' : '#d6f25c'
+      ctx.arc(p.x, p.y, h.kind === 'sweeper' ? 4.2 : 3.2, 0, Math.PI * 2)
+      ctx.fill()
+    }
     const seen = new Set<number>()
     for (const s of samples) {
       if (!s.pad || seen.has(s.pad)) continue

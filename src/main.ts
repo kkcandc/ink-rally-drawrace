@@ -208,6 +208,7 @@ function setGl(on: boolean) {
 
 function showTitle() {
   screen = 'title'
+  document.title = 'SKETCH SEND'
   stopRace()
   stopPortrait()
   pad.unmount()
@@ -216,20 +217,20 @@ function showTitle() {
   ui.innerHTML = `
     <section class="screen title">
       <div class="title-copy">
-        <p class="eyebrow">Night circuit · paper cutouts</p>
-        <h1><span>Ink</span> <em>Rally</em></h1>
-        <p class="lede">Draw a side view. The right edge is the nose. The silhouette then has to survive the page — laps, curbs, and boost ink included.</p>
+        <p class="eyebrow">Night smear · stands are full</p>
+        <h1><span>Sketch</span> <em>Send</em></h1>
+        <p class="lede">Draw a side view. The right edge is the nose. Then send that doodle — lime SEND pads, a crowd in the stands, and hazards that want the line more than you do.</p>
         <div class="row">
-          <button class="btn primary" data-go="draw">Draw a racer</button>
-          <button class="btn" data-go="scribble">Quick scribble</button>
+          <button class="btn primary" data-go="draw">Sketch a sled</button>
+          <button class="btn" data-go="scribble">Panic doodle</button>
         </div>
         <div class="row tight">
-          <button class="btn ghost" data-go="gallery">Gallery</button>
-          <button class="btn ghost" data-go="cup">${resume ? `Resume cup · ${cup!.round + 1}/3` : 'Ink Cup'}</button>
-          <button class="btn ghost" data-go="loaner">Loaner moth</button>
+          <button class="btn ghost" data-go="gallery">Sticker wall</button>
+          <button class="btn ghost" data-go="cup">${resume ? `Resume cup · ${cup!.round + 1}/3` : 'Smear Cup'}</button>
+          <button class="btn ghost" data-go="loaner">Airtime moth</button>
           <button class="btn ghost" id="mute">${save.settings.sound ? 'Sound on' : 'Sound off'}</button>
         </div>
-        <p class="fine">Steer with arrows or A/D. Space slides. Shift spends boost. The shape is the setup.</p>
+        <p class="fine">Arrows or A/D steer. Space slides. Shift spends SEND. Purple slicks spin, orange blots glue, cones bounce, sweepers cross the lane.</p>
       </div>
     </section>`
   startAttract()
@@ -274,7 +275,7 @@ function showDraw() {
     <section class="screen draw">
       <header class="bar-top">
         <button class="btn tiny" data-go="title">Back</button>
-        <div class="word">Ink desk</div>
+        <div class="word">Sketch pit</div>
         <p class="hint">Right edge is the nose. Long and low is quick. Heavy and flat stays stuck. Jagged feet slide.</p>
       </header>
       <div class="desk">
@@ -298,9 +299,9 @@ function showDraw() {
           <button class="btn tiny" id="clear">Clear</button>
         </div>
         <div class="row">
-          <button class="btn tiny" id="loan-cycle">Load a loaner</button>
-          <button class="btn tiny" id="scribble-here">Scribble</button>
-          <button class="btn primary" id="to-studio">Race this</button>
+          <button class="btn tiny" id="loan-cycle">Steal a rival</button>
+          <button class="btn tiny" id="scribble-here">Panic doodle</button>
+          <button class="btn primary" id="to-studio">Send it</button>
         </div>
       </footer>
     </section>`
@@ -357,7 +358,7 @@ function refreshTicket() {
   if (!host || screen !== 'draw') return
   const mask = canvasToMask(pad.canvas, pad.color)
   const stats = analyze(mask)
-  host.innerHTML = ticketHtml(stats, stats.raceable ? 'This ink can race.' : stats.reason)
+  host.innerHTML = ticketHtml(stats, stats.raceable ? 'This sled can send.' : stats.reason)
   const go = document.querySelector('#to-studio')
   go?.toggleAttribute('disabled', !stats.raceable)
 }
@@ -371,7 +372,7 @@ function ticketHtml(stats: RuntimeStats, note: string): string {
     ['Mass', stats.mass],
   ]
   return `
-    <p class="kicker">Handling ticket</p>
+    <p class="kicker">Setup card</p>
     <h2>${esc(stats.raceable ? stats.read : 'Unread')}</h2>
     ${bars.map(([label, value]) => `<div class="meter"><span>${label}</span><i><b style="width:${value}%"></b></i><em>${value}</em></div>`).join('')}
     <p class="quirk">${esc(stats.quirk)}</p>
@@ -418,8 +419,8 @@ function openStudio(next: Art, syncPad = false) {
     <section class="screen studio">
       <header class="bar-top">
         <button class="btn tiny" data-go="draw">Redraw</button>
-        <div class="word">${forced ? `Ink Cup · round ${(cup!.round % 3) + 1} / 3` : 'Paddock'}</div>
-        <button class="btn tiny" data-go="gallery">Gallery</button>
+        <div class="word">${forced ? `Smear Cup · round ${(cup!.round % 3) + 1} / 3` : 'Line check'}</div>
+        <button class="btn tiny" data-go="gallery">Sticker wall</button>
       </header>
       <div class="studio-grid">
         <div class="stage">
@@ -433,7 +434,7 @@ function openStudio(next: Art, syncPad = false) {
           ${ticketHtml(art.stats, art.stats.read)}
           ${forced ? cupTableHtml() : ''}
           <div class="choices">
-            <div class="choice-label">Page</div>
+            <div class="choice-label">Circuit</div>
             <div class="track-grid">
               ${(forced ? [track] : TRACKS).map((t) => trackCard(t)).join('')}
             </div>
@@ -451,19 +452,19 @@ function openStudio(next: Art, syncPad = false) {
             <div>
               <div class="choice-label">Field</div>
               <div class="segment" id="field">
-                <button data-field="0" class="${field === 0 ? 'on' : ''}">Trial</button>
-                <button data-field="3" class="${field === 3 ? 'on' : ''}">Heat</button>
-                <button data-field="5" class="${field === 5 ? 'on' : ''}">Blot</button>
+                <button data-field="0" class="${field === 0 ? 'on' : ''}">Ghost Lap</button>
+                <button data-field="3" class="${field === 3 ? 'on' : ''}">Pack Heat</button>
+                <button data-field="5" class="${field === 5 ? 'on' : ''}">Full Grid</button>
               </div>
             </div>
           </div>`
           }
           <div class="share-box">
-            <label>Share code <input id="share-code" readonly value="${esc(art.code)}" /></label>
-            <button class="btn tiny" id="copy-share">Copy link</button>
+            <label>Send link <input id="share-code" readonly value="${esc(art.code)}" /></label>
+            <button class="btn tiny" id="copy-share">Copy send</button>
           </div>
-          <button class="btn primary xl" id="start-race">${forced ? 'Roll this round' : 'Drop the flag'}</button>
-          <p class="fine">Arrows or A/D steer · Space drift · Shift boost · S brakes. Boost pads are the green ink. Red speed means the corner is tighter than you are.</p>
+          <button class="btn primary xl" id="start-race">${forced ? 'Send this round' : 'Send the line'}</button>
+          <p class="fine">Arrows or A/D steer · Space drift · Shift spends SEND · S brakes. Lime gates are SEND pads. Purple slicks spin, orange blots glue, cones bounce, the sweeper crosses. Red speed means the corner is tighter than you are.</p>
         </div>
       </div>
     </section>`
@@ -473,7 +474,7 @@ function openStudio(next: Art, syncPad = false) {
   bindClicks()
   document.querySelector('#racer-name')?.addEventListener('input', (e) => {
     if (!art) return
-    art.name = (e.target as HTMLInputElement).value.slice(0, 22) || 'Untitled Ink'
+    art.name = (e.target as HTMLInputElement).value.slice(0, 22) || 'Nameless Sled'
   })
   document.querySelector('#start-race')?.addEventListener('click', () => beginRace())
   document.querySelector('#copy-share')?.addEventListener('click', () => copyShare())
@@ -511,7 +512,7 @@ function trackCard(t: BuiltTrack): string {
     ${trackSvg(t)}
     <strong>${esc(t.name)}</strong>
     <em>${esc(t.tagline)}</em>
-    <small>${best != null ? `Best ${formatTime(best)}` : 'No mark yet'}</small>
+    <small>${best != null ? `Best ${formatTime(best)}` : 'No send yet'}</small>
   </button>`
 }
 
@@ -524,7 +525,7 @@ function bestTime(id: string): number | null {
 function cupTableHtml(): string {
   if (!cup) return ''
   const rows = [...cup.points].sort((a, b) => b.pts - a.pts)
-  if (!rows.length) return `<p class="fine">Three pages. Ten points for a win.</p>`
+  if (!rows.length) return `<p class="fine">Three circuits. Ten points if you send it first.</p>`
   return `<ol class="cup-mini">${rows
     .map((r) => `<li class="${r.you ? 'you' : ''}"><span>${esc(r.name)}</span><b>${r.pts}</b></li>`)
     .join('')}</ol>`
@@ -536,9 +537,10 @@ function copyShare() {
   url.search = ''
   url.searchParams.set('ink', art.code)
   const text = url.toString()
+  const sled = art.name
   void navigator.clipboard?.writeText(text).then(
-    () => toast('Link copied. The code is the ink.'),
-    () => toast('Copy the code from the field.'),
+    () => toast(`Send link copied. ${sled} is ready to ride.`),
+    () => toast('Copy the send link from the field.'),
   )
   audio.blip()
 }
@@ -560,7 +562,7 @@ function beginRace() {
   const arts = new Map<string, { mask: InkMask; sprite: HTMLCanvasElement; stats: RuntimeStats }>()
   const player: RacerSpec = {
     id: 'you',
-    name: art.name || 'Untitled Ink',
+    name: art.name || 'Nameless Sled',
     color: art.mask.color,
     stats: art.stats,
     isPlayer: true,
@@ -577,7 +579,7 @@ function beginRace() {
       if (frames.length > 4) {
         specs.push({
           id: 'ghost',
-          name: 'Ghost',
+          name: 'Your Ghost',
           color: art.mask.color,
           stats: art.stats,
           isGhost: true,
@@ -602,7 +604,8 @@ function beginRace() {
   screen = 'race'
   document.body.classList.add('racing')
   setGl(true)
-  ui.innerHTML = hudHtml(useField === 0)
+  ui.innerHTML = hudHtml(useField === 0, useTrack.name)
+  document.title = `SKETCH SEND — ${useTrack.name}`
   bindTouch()
   document.querySelector('#pause-btn')?.addEventListener('click', () => togglePause())
   document.querySelector('#resume')?.addEventListener('click', () => togglePause(false))
@@ -644,13 +647,13 @@ function rivalSpec(
   return { id: rival.id, name: rival.name, color: rival.color, stats, ai: rival.ai }
 }
 
-function hudHtml(trial: boolean): string {
+function hudHtml(trial: boolean, trackName: string): string {
   return `
     <section class="hud">
       <header class="hud-top">
         <div>
           <div class="place" id="hud-place">–</div>
-          <div class="field-note" id="hud-field">${trial ? 'Time trial' : ''}</div>
+          <div class="field-note" id="hud-field">${trial ? 'Ghost Lap' : 'Live heat'} · ${esc(trackName)}</div>
         </div>
         <div class="lapblock">
           <div id="hud-lap">1/3</div>
@@ -662,7 +665,7 @@ function hudHtml(trial: boolean): string {
       <ol id="hud-rows"></ol>
       <div id="count" class="count"></div>
       <div id="banner" class="banner"></div>
-      <div id="coach" class="coach">Hold <b>Space</b> through the bend to slide and fill the vial. <b>Shift</b> spends it. Red numbers mean brake or drift — the curb is hungry.</div>
+      <div id="coach" class="coach">Hold <b>Space</b> in the bend to slide and fill SEND. <b>Shift</b> spends it. Purple slicks spin you. Orange blots glue the wheels. Cones bounce. The sweeper crosses the lane.</div>
       <footer class="hud-bottom">
         <div class="speed-block">
           <div id="hud-speed" class="speed">0</div>
@@ -682,8 +685,8 @@ function hudHtml(trial: boolean): string {
       </div>
       <div id="pause" class="pause">
         <div class="panel">
-          <h2>Ink held.</h2>
-          <p>The page waits.</p>
+          <h2>Line held.</h2>
+          <p>The crowd can wait.</p>
           <div class="row">
             <button class="btn primary" id="resume" type="button">Resume</button>
             <button class="btn" id="retire" type="button">Retire</button>
@@ -746,7 +749,15 @@ function onRaceEvent(e: SimEvent) {
   if (e.type === 'hit') audio.hit()
   if (e.type === 'pad') {
     audio.pad()
-    flashBanner('INK')
+    flashBanner('SEND')
+  }
+  if (e.type === 'hazard') {
+    if (e.kind === 'slick') audio.slick()
+    else if (e.kind === 'sticky') audio.sticky()
+    else if (e.kind === 'cone') audio.cone()
+    else audio.sweeper()
+    const shout = e.kind === 'slick' ? 'SLICK' : e.kind === 'sticky' ? 'STUCK' : e.kind === 'cone' ? 'CONE' : 'SWEEP'
+    flashBanner(shout)
   }
   if (e.type === 'boost') audio.boost()
 }
@@ -901,14 +912,14 @@ function showResults(res: RaceResult) {
       const winner = [...cup.points].sort((a, b) => b.pts - a.pts)[0]
       const youWon = !!winner?.you
       if (youWon) item.cups = 1
-      cupNote = youWon ? 'The cup is yours. The ink held.' : `${winner?.name ?? 'Someone'} lifts the cup.`
+      cupNote = youWon ? 'Smear Cup is yours. The sled held.' : `${winner?.name ?? 'Someone'} lifts the Smear Cup.`
       cup = null
       save.cup = null
       writeSave(save)
     } else {
       save.cup = cup
       writeSave(save)
-      cupNote = `Round filed. Next page: ${getTrack(CUP_TRACKS[cup.round]).name}.`
+      cupNote = `Round filed. Next circuit: ${getTrack(CUP_TRACKS[cup.round]).name}.`
     }
   }
   upsertGallery(save, item)
@@ -921,8 +932,8 @@ function showResults(res: RaceResult) {
         <h1 class="${win ? 'win' : ''}">${ordinal(res.place)}</h1>
         <p class="big-time">${formatTime(res.time)}</p>
         <p class="fine">Best lap ${formatTime(res.bestLap)} ${res.points ? `· ${res.points} cup pts` : ''}</p>
-        ${res.beatGhost === true ? '<p class="quirk">You redrew the ghost.</p>' : ''}
-        ${res.beatGhost === false && res.ghostRace != null ? `<p class="quirk">Ghost still leads by ${formatTime(res.ghostRace - res.time)}.</p>` : ''}
+        ${res.beatGhost === true ? '<p class="quirk">You erased the ghost.</p>' : ''}
+        ${res.beatGhost === false && res.ghostRace != null ? `<p class="quirk">Your Ghost still has the line by ${formatTime(res.ghostRace - res.time)}.</p>` : ''}
         ${cupNote ? `<p class="quirk">${esc(cupNote)}</p>` : ''}
         <ol class="results-list">
           ${res.rows
@@ -935,9 +946,9 @@ function showResults(res: RaceResult) {
         ${cupBoard}
         <div class="row">
           <button class="btn primary" id="rematch">Rematch</button>
-          ${cup && cup.round < 3 ? '<button class="btn" id="next-cup">Next round</button>' : '<button class="btn" id="next-track">Next page</button>'}
+          ${cup && cup.round < 3 ? '<button class="btn" id="next-cup">Next round</button>' : '<button class="btn" id="next-track">Next circuit</button>'}
           <button class="btn" data-go="draw">Redraw</button>
-          <button class="btn ghost" data-go="gallery">Gallery</button>
+          <button class="btn ghost" data-go="gallery">Sticker wall</button>
         </div>
       </div>
     </section>`
@@ -999,16 +1010,16 @@ function showGallery() {
     <section class="screen gallery">
       <header class="bar-top">
         <button class="btn tiny" data-go="title">Back</button>
-        <div class="word">Session gallery</div>
+        <div class="word">Sticker wall</div>
         <button class="btn tiny" id="paste-go">Open a code</button>
       </header>
       <div class="paste">
-        <input id="paste-code" placeholder="Paste an INK1 code or a share link" />
+        <input id="paste-code" placeholder="Paste a send link or an INK1 code" />
       </div>
       ${
         cards.length
           ? `<div class="gallery-grid">${cards.map(galleryCard).join('')}</div>`
-          : `<div class="empty"><h2>The desk is bare.</h2><p>Draw something with a belly and a nose. It will wait here, on this browser, for the next heat.</p><button class="btn primary" data-go="draw">Draw a racer</button></div>`
+          : `<div class="empty"><h2>No sleds yet.</h2><p>Sketch a belly and a nose. It waits on this browser for the next send.</p><button class="btn primary" data-go="draw">Sketch a sled</button></div>`
       }
     </section>`
   bindClicks()
@@ -1154,7 +1165,7 @@ function startCup() {
   if (!art) {
     const mask = scribble(99 + ((Math.random() * 500) | 0), INKS[2].hex)
     art = artFromMask(suggestName(mask), mask)
-    toast('A scribble is in the cup. Redraw if you want your own hand.')
+    toast('A panic doodle is in the Smear Cup. Redraw if you want your own hand.')
   }
   cup = { round: 0, name: art.name, code: art.code, points: [] }
   save.cup = cup

@@ -4,14 +4,14 @@ export const MASK_W = 128
 export const MASK_H = 72
 
 export const INKS = [
-  { id: 'sumi', hex: '#1c1915', name: 'Sumi' },
-  { id: 'vermillion', hex: '#ef4b32', name: 'Vermillion' },
-  { id: 'sea', hex: '#147a86', name: 'Sea' },
-  { id: 'indigo', hex: '#2c3ec8', name: 'Indigo' },
-  { id: 'leaf', hex: '#2c7a3c', name: 'Leaf' },
-  { id: 'gold', hex: '#c9841a', name: 'Gold' },
-  { id: 'magenta', hex: '#d43378', name: 'Magenta' },
-  { id: 'violet', hex: '#6d3cba', name: 'Violet' },
+  { id: 'sumi', hex: '#1c1915', name: 'Night Wax' },
+  { id: 'vermillion', hex: '#ef4b32', name: 'Hot Wax' },
+  { id: 'sea', hex: '#147a86', name: 'Pool' },
+  { id: 'indigo', hex: '#2c3ec8', name: 'Midnight' },
+  { id: 'leaf', hex: '#2c7a3c', name: 'Slime' },
+  { id: 'gold', hex: '#c9841a', name: 'Honey' },
+  { id: 'magenta', hex: '#d43378', name: 'Splat' },
+  { id: 'violet', hex: '#6d3cba', name: 'Grape' },
 ] as const
 
 export type InkMask = {
@@ -59,7 +59,7 @@ export type Rival = {
   ai: AiProfile
 }
 
-const LEFT = ['Needle', 'Blot', 'Quill', 'Puddle', 'Folio', 'Margin', 'Carbon', 'Wet', 'Loose', 'Gallery', 'Iron', 'Drip']
+const LEFT = ['Skid', 'Nose', 'Flick', 'Curb', 'Send', 'Drip', 'Smear', 'Pop', 'Rail', 'Ghost', 'Bomb', 'Slide']
 const RIGHT = ['Newt', 'Bison', 'Mantis', 'Pug', 'Heron', 'Imp', 'Ox', 'Eel', 'Crab', 'Wren', 'Toad', 'Moth']
 
 export function suggestName(mask: InkMask): string {
@@ -541,41 +541,41 @@ function drawMoth(bits: Uint8Array) {
 export const RIVALS: Rival[] = [
   {
     id: 'newt',
-    name: 'Needle Newt',
+    name: 'Skid Newt',
     color: INKS[2].hex,
-    blurb: 'A long wet line. Hates corners, loves the margin.',
+    blurb: 'Long wet line. Hates corners, sends the straight.',
     mask: maskOf(fill(drawNewt), INKS[2].hex),
     ai: { skill: 0.96, aggression: 0.78, lineBias: -0.4, seed: 3 },
   },
   {
     id: 'bison',
-    name: 'Blot Bison',
+    name: 'Curb Bison',
     color: INKS[5].hex,
-    blurb: 'Heavy stamp. Once it is rolling, the curb moves.',
+    blurb: 'Heavy stamp. Once it rolls, the rail moves.',
     mask: maskOf(fill(drawBison), INKS[5].hex),
     ai: { skill: 0.9, aggression: 0.42, lineBias: 0.8, seed: 9 },
   },
   {
     id: 'mantis',
-    name: 'Quill Mantis',
+    name: 'Flick Mantis',
     color: INKS[1].hex,
-    blurb: 'All elbows. Drifts because the feet barely agree.',
+    blurb: 'All elbows. Slides because the feet never agree.',
     mask: maskOf(fill(drawMantis), INKS[1].hex),
     ai: { skill: 0.94, aggression: 0.88, lineBias: 0.2, seed: 15 },
   },
   {
     id: 'pug',
-    name: 'Puddle Pug',
+    name: 'Sticky Pug',
     color: INKS[6].hex,
-    blurb: 'Round, rude, and quicker off the blot than it looks.',
+    blurb: 'Round, rude, and gone before the blot dries.',
     mask: maskOf(fill(drawPug), INKS[6].hex),
     ai: { skill: 0.86, aggression: 0.55, lineBias: -1.1, seed: 21 },
   },
   {
     id: 'saint',
-    name: 'Splinter Saint',
+    name: 'Manual Saint',
     color: INKS[7].hex,
-    blurb: 'Tall as a drop cap. Top-heavy and theatrical.',
+    blurb: 'Tall as a drop cap. Top-heavy and full of theater.',
     mask: maskOf(fill(drawSaint), INKS[7].hex),
     ai: { skill: 0.88, aggression: 0.7, lineBias: 1.3, seed: 27 },
   },
@@ -583,9 +583,9 @@ export const RIVALS: Rival[] = [
 
 export const LOANER_MOTH: Rival = {
   id: 'moth',
-  name: 'Margin Moth',
+  name: 'Airtime Moth',
   color: INKS[3].hex,
-  blurb: 'Wings for days. A loaner if your page is still blank.',
+  blurb: 'Wings for days. A loaner when the page is still blank.',
   mask: maskOf(fill(drawMoth), INKS[3].hex),
   ai: { skill: 0.8, aggression: 0.5, lineBias: 0, seed: 4 },
 }

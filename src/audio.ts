@@ -62,6 +62,25 @@ export class AudioBus {
     this.env(90, 0.16, 'sawtooth', 0.06, -40)
   }
 
+  slick() {
+    this.env(240, 0.28, 'sawtooth', 0.05, -160)
+    this.env(620, 0.12, 'square', 0.03, 80)
+  }
+
+  sticky() {
+    this.env(70, 0.32, 'triangle', 0.07, -30)
+  }
+
+  cone() {
+    this.env(180, 0.09, 'square', 0.06, -90)
+    this.env(90, 0.14, 'sawtooth', 0.05, -40)
+  }
+
+  sweeper() {
+    this.env(140, 0.22, 'square', 0.06, 60)
+    this.env(80, 0.18, 'sawtooth', 0.05, -50)
+  }
+
   pad() {
     this.env(520, 0.2, 'square', 0.045, 300)
   }
