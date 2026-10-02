@@ -102,6 +102,7 @@ describe('racing', () => {
         progress: progressOf(player, track.length),
         speed: progressOf(player, track.length) / Math.max(0.1, sim.time),
         maxX,
+        pads: sim.events.filter((e) => e.type === 'pad').length,
       }
     }
     const ai = drive('ai')
@@ -110,6 +111,7 @@ describe('racing', () => {
     expect(ai.best ?? 0).toBeGreaterThan(18)
     expect(ai.best ?? 999).toBeLessThan(70)
     expect(ai.speed).toBeGreaterThan(16)
+    expect(ai.pads).toBeGreaterThanOrEqual(3)
     expect(statue.scrape).toBeGreaterThan(ai.scrape + 0.4)
   })
 

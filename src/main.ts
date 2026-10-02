@@ -744,7 +744,10 @@ function onRaceEvent(e: SimEvent) {
   }
   if (e.type === 'finish') finishRace()
   if (e.type === 'hit') audio.hit()
-  if (e.type === 'pad') audio.pad()
+  if (e.type === 'pad') {
+    audio.pad()
+    flashBanner('INK')
+  }
   if (e.type === 'boost') audio.boost()
 }
 

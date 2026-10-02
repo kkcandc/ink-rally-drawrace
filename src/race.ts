@@ -56,7 +56,7 @@ export class RaceView {
   private skidGeo: THREE.PlaneGeometry
   private skidMat: THREE.MeshBasicMaterial
   private lamps: THREE.Mesh[] = []
-  private padMats: THREE.MeshStandardMaterial[] = []
+  private padMats: THREE.MeshBasicMaterial[] = []
   private sun: THREE.DirectionalLight
   private sunTarget = new THREE.Object3D()
   private reduced: boolean
@@ -336,15 +336,16 @@ export class RaceView {
       while (j < n && track.samples[j].pad === id) j++
       const positions: number[] = []
       const indices: number[] = []
+      const lift = 0.22
       for (let k = i; k < j; k++) {
         const s = track.samples[k]
-        const half = s.width * 0.32
+        const half = s.width * 0.36
         positions.push(
           s.x - s.rx * half,
-          s.y + s.uy * 0.2 + 0.06,
+          s.y - s.ry * half + s.uy * lift,
           s.z - s.rz * half,
           s.x + s.rx * half,
-          s.y + s.uy * 0.2 + 0.06,
+          s.y + s.ry * half + s.uy * lift,
           s.z + s.rz * half,
         )
       }
@@ -358,39 +359,49 @@ export class RaceView {
         const geo = new THREE.BufferGeometry()
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
         geo.setIndex(indices)
-        const mat = new THREE.MeshStandardMaterial({
+        geo.computeVertexNormals()
+        const mat = new THREE.MeshBasicMaterial({
           color: '#d6f25c',
-          emissive: '#d6f25c',
-          emissiveIntensity: 1.15,
-          roughness: 0.35,
+          side: THREE.DoubleSide,
           polygonOffset: true,
-          polygonOffsetFactor: -4,
-          polygonOffsetUnits: -4,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
         })
         this.padMats.push(mat)
-        const mesh = new THREE.Mesh(geo, mat)
-        group.add(mesh)
-        const a = track.samples[i]
-        const b = track.samples[Math.min(n - 1, j - 1)]
-        for (const s of [a, b]) {
-          const blade = new THREE.Mesh(
-            new THREE.BoxGeometry(0.18, 0.85, 1.4),
-            mat,
-          )
-          blade.position.set(s.x, s.y + s.uy * 0.55, s.z)
-          const basis = new THREE.Matrix4().makeBasis(
-            new THREE.Vector3(s.rx, s.ry, s.rz),
-            new THREE.Vector3(s.ux, s.uy, s.uz),
-            new THREE.Vector3(s.tx, s.ty, s.tz),
-          )
-          blade.quaternion.setFromRotationMatrix(basis)
-          blade.castShadow = true
-          group.add(blade)
-        }
+        group.add(new THREE.Mesh(geo, mat))
+        group.add(this.inkGate(track.samples[i], mat))
       }
       i = j
     }
     return group
+  }
+
+  private inkGate(s: BuiltTrack['samples'][number], mat: THREE.Material): THREE.Group {
+    const gate = new THREE.Group()
+    const half = Math.max(2.4, s.width * 0.48)
+    const postH = 2.7
+    const basis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(s.rx, s.ry, s.rz),
+      new THREE.Vector3(s.ux, s.uy, s.uz),
+      new THREE.Vector3(s.tx, s.ty, s.tz),
+    )
+    const quat = new THREE.Quaternion().setFromRotationMatrix(basis)
+    const post = new THREE.BoxGeometry(0.46, postH, 0.46)
+    for (const side of [-1, 1]) {
+      const mesh = new THREE.Mesh(post, mat)
+      mesh.quaternion.copy(quat)
+      mesh.position.set(
+        s.x + s.rx * half * side + s.ux * postH * 0.5,
+        s.y + s.ry * half * side + s.uy * postH * 0.5,
+        s.z + s.rz * half * side + s.uz * postH * 0.5,
+      )
+      gate.add(mesh)
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(half * 2, 0.4, 0.46), mat)
+    lintel.quaternion.copy(quat)
+    lintel.position.set(s.x + s.ux * postH, s.y + s.uy * postH, s.z + s.uz * postH)
+    gate.add(lintel)
+    return gate
   }
 
   private finish(track: BuiltTrack): THREE.Mesh {
@@ -606,8 +617,10 @@ export class RaceView {
     }
     const c = this.sim.countdown
     const lit = !this.sim.started ? (c > 2 ? 0 : c > 1 ? 1 : c > 0 ? 2 : 3) : 3
-    const pulse = 0.75 + Math.sin(this.sim.time * 7) * 0.35
-    for (const mat of this.padMats) mat.emissiveIntensity = pulse
+    const pulse = 0.72 + Math.sin(this.sim.time * 7) * 0.28
+    for (const mat of this.padMats) {
+      mat.color.setRGB((0.84 * pulse), (0.95 * pulse), (0.36 * pulse))
+    }
     this.lamps.forEach((lamp, i) => {
       const mat = lamp.material as THREE.MeshStandardMaterial
       const on = this.sim.started ? true : i < lit
@@ -680,6 +693,22 @@ export class RaceView {
     ctx.closePath()
     ctx.strokeStyle = 'rgba(243,234,215,0.85)'
     ctx.lineWidth = 3
+    ctx.stroke()
+    ctx.strokeStyle = '#d6f25c'
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    let inking = false
+    samples.forEach((s) => {
+      if (!s.pad) {
+        inking = false
+        return
+      }
+      const p = project(s.x, s.z)
+      if (!inking) {
+        ctx.moveTo(p.x, p.y)
+        inking = true
+      } else ctx.lineTo(p.x, p.y)
+    })
     ctx.stroke()
     for (const r of this.sim.racers) {
       const f = frameAt(this.sim.track, r.s, r.x)
