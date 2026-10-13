@@ -82,7 +82,9 @@ export class AudioBus {
   }
 
   pad() {
-    this.env(520, 0.2, 'square', 0.045, 300)
+    this.env(392, 0.07, 'square', 0.055, 180)
+    this.env(784, 0.14, 'triangle', 0.045, 260)
+    this.env(1174, 0.09, 'square', 0.028, 80)
   }
 
   boost() {

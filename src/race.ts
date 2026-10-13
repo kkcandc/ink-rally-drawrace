@@ -35,7 +35,17 @@ export type HudSnap = {
   rows: { name: string; you: boolean; done: boolean; detail: string }[]
 }
 
-type Puff = { mesh: THREE.Mesh; life: number; max: number }
+type Puff = {
+  mesh: THREE.Mesh
+  life: number
+  max: number
+  vx: number
+  vy: number
+  vz: number
+  spin: number
+  ink: boolean
+  hot: boolean
+}
 
 export class RaceView {
   private renderer: THREE.WebGLRenderer
@@ -48,12 +58,17 @@ export class RaceView {
   private celebrating = false
   private orbit = 0
   private shake = 0
+  private kick = 0
+  private exposurePunch = 0
+  private padFlash = 0
+  private hotPad = 0
   private look = new THREE.Vector3()
   private camPos = new THREE.Vector3()
   private ready = false
   private groups = new Map<string, { group: THREE.Group; wheels: THREE.Object3D[]; label: THREE.Sprite }>()
   private puffs: Puff[] = []
   private puffGeo = new THREE.SphereGeometry(1, 6, 6)
+  private shredGeo = new THREE.BoxGeometry(1, 0.12, 0.55)
   private skids: { mesh: THREE.Mesh; life: number }[] = []
   private skidGeo: THREE.PlaneGeometry
   private skidMat: THREE.MeshBasicMaterial
@@ -71,6 +86,7 @@ export class RaceView {
   private fx: HTMLElement | null
   private hazards: HazardActor[] = []
   private fxTimer = 0
+  private sendTimer = 0
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -157,7 +173,9 @@ export class RaceView {
     this.disposed = true
     cancelAnimationFrame(this.raf)
     window.removeEventListener('resize', this.onResize)
-    this.fx?.classList.remove('boost', 'hit', 'slick', 'sticky', 'cone', 'sweeper')
+    window.clearTimeout(this.fxTimer)
+    window.clearTimeout(this.sendTimer)
+    this.fx?.classList.remove('boost', 'hit', 'slick', 'sticky', 'cone', 'sweeper', 'send')
     disposeObject(this.scene)
     this.renderer.dispose()
   }
@@ -502,21 +520,28 @@ export class RaceView {
       this.scene.add(built.group)
       this.groups.set(r.id, { ...built, label })
     }
-    for (let i = 0; i < 36; i++) {
-      const mesh = new THREE.Mesh(
-        this.puffGeo,
-        new THREE.MeshBasicMaterial({ color: '#d9d0c2', transparent: true, opacity: 0, depthWrite: false }),
-      )
-      mesh.visible = false
-      this.scene.add(mesh)
-      this.puffs.push({ mesh, life: 0, max: 1 })
-    }
+    for (let i = 0; i < 40; i++) this.addPuff(this.puffGeo, true)
+    for (let i = 0; i < 28; i++) this.addPuff(this.shredGeo, false)
     for (let i = 0; i < 70; i++) {
       const mesh = new THREE.Mesh(this.skidGeo, this.skidMat.clone())
       mesh.visible = false
       this.scene.add(mesh)
       this.skids.push({ mesh, life: 0 })
     }
+  }
+
+  private addPuff(geo: THREE.BufferGeometry, ink: boolean) {
+    const mesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({ color: '#d9d0c2', transparent: true, opacity: 0, depthWrite: false }),
+    )
+    mesh.visible = false
+    this.scene.add(mesh)
+    this.puffs.push({ mesh, life: 0, max: 1, vx: 0, vy: 0, vz: 0, spin: 0, ink, hot: false })
+  }
+
+  private takePuff(ink: boolean): Puff | undefined {
+    return this.puffs.find((p) => p.life <= 0 && p.ink === ink) ?? this.puffs.find((p) => p.life <= 0)
   }
 
   private tick(dt: number) {
@@ -527,6 +552,7 @@ export class RaceView {
         const event = this.sim.events[i]
         this.opts.onEvent(event)
         if (event.type === 'hazard') this.burstHazard(event.kind)
+        if (event.type === 'pad') this.burstPad(event.id)
       }
     }
     this.sim.events.length = 0
@@ -591,10 +617,16 @@ export class RaceView {
     const f = frameAt(this.sim.track, target.s, target.x)
     const color = kind === 'slick' ? '#c9b6ff' : kind === 'sticky' ? '#ff9a4a' : kind === 'cone' ? '#ef4b32' : '#d6f25c'
     for (let i = 0; i < 8; i++) {
-      const slot = this.puffs.find((p) => p.life <= 0)
+      const slot = this.takePuff(true)
       if (!slot) break
       slot.life = slot.max = 0.55
+      slot.vx = 0
+      slot.vy = 0
+      slot.vz = 0
+      slot.spin = 0
+      slot.hot = false
       slot.mesh.visible = true
+      slot.mesh.rotation.set(0, 0, 0)
       slot.mesh.position.set(f.x + (Math.random() - 0.5) * 2.4, f.y + 0.4 + Math.random() * 0.8, f.z + (Math.random() - 0.5) * 2.4)
       slot.mesh.scale.setScalar(0.35 + Math.random() * 0.35)
       const mat = slot.mesh.material as THREE.MeshBasicMaterial
@@ -608,11 +640,65 @@ export class RaceView {
     this.fxTimer = window.setTimeout(() => this.fx?.classList.remove(kind), 460)
   }
 
+  private burstPad(id: number) {
+    const target = this.sim.racers.find((r) => r.isPlayer) ?? this.focusRacer()
+    if (!target) return
+    const f = frameAt(this.sim.track, target.s, target.x)
+    const count = this.reduced ? 8 : 22
+    for (let i = 0; i < count; i++) {
+      const shred = i % 2 === 0
+      const slot = this.takePuff(!shred)
+      if (!slot) break
+      slot.life = slot.max = 0.38 + Math.random() * 0.2
+      slot.mesh.visible = true
+      const side = (Math.random() - 0.5) * 2
+      const along = (Math.random() - 0.35) * 1.6
+      slot.mesh.position.set(
+        f.x + f.rx * side * 0.8 + f.tx * along,
+        f.y + 0.45 + Math.random() * 0.7,
+        f.z + f.rz * side * 0.8 + f.tz * along,
+      )
+      if (shred) {
+        slot.mesh.scale.set(1.1 + Math.random() * 1.8, 1, 0.9 + Math.random() * 1.1)
+        slot.mesh.rotation.set(Math.random() * 1.2, Math.random() * Math.PI, Math.random() * Math.PI)
+      } else {
+        slot.mesh.rotation.set(0, 0, 0)
+        slot.mesh.scale.setScalar(0.45 + Math.random() * 0.7)
+      }
+      const spray = this.reduced ? 0 : 7 + Math.random() * 9
+      const lift = this.reduced ? 0 : 4 + Math.random() * 7
+      slot.vx = this.reduced ? 0 : f.rx * side * spray + f.tx * (Math.random() - 0.15) * 5
+      slot.vy = this.reduced ? 0 : lift
+      slot.vz = this.reduced ? 0 : f.rz * side * spray + f.tz * (Math.random() - 0.15) * 5
+      slot.spin = this.reduced ? 0 : (Math.random() - 0.5) * 9
+      slot.hot = true
+      const mat = slot.mesh.material as THREE.MeshBasicMaterial
+      mat.color.set(shred && Math.random() > 0.35 ? '#f3ead7' : '#d6f25c')
+      mat.opacity = 0.95
+    }
+    this.hotPad = id
+    this.padFlash = 0.48
+    this.fx?.classList.add('send')
+    window.clearTimeout(this.sendTimer)
+    this.sendTimer = window.setTimeout(() => this.fx?.classList.remove('send'), 400)
+    if (this.reduced) return
+    this.shake = Math.min(1.05, this.shake + 0.72)
+    this.kick = 1
+    this.exposurePunch = 0.46
+    this.camera.fov = Math.min(78, this.camera.fov + 8)
+  }
+
   private puffAt(f: ReturnType<typeof frameAt>, r: SimRacer) {
-    const slot = this.puffs.find((p) => p.life <= 0)
+    const slot = this.takePuff(true)
     if (!slot) return
     slot.life = slot.max = r.boosting ? 0.45 : 0.7
+    slot.vx = 0
+    slot.vy = 0
+    slot.vz = 0
+    slot.spin = 0
+    slot.hot = false
     slot.mesh.visible = true
+    slot.mesh.rotation.set(0, 0, 0)
     const back = r.boosting ? -1.2 : -0.2
     slot.mesh.position.set(
       f.x - f.tx * back + f.rx * r.x * 0,
@@ -661,8 +747,11 @@ export class RaceView {
     }
     if (target.scraping && !this.reduced) this.shake = Math.min(0.35, this.shake + 0.12)
     this.shake *= Math.exp(-3.5 * dt)
+    this.kick *= Math.exp(-9 * dt)
+    this.exposurePunch *= Math.exp(-10 * dt)
     this.camera.position.copy(this.camPos)
-    if (this.shake > 0.01) {
+    if (!this.reduced && this.kick > 0.02) this.camera.position.y += this.kick * 1.15
+    if (this.shake > 0.01 && !this.reduced) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake
       this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.6
     }
@@ -670,6 +759,7 @@ export class RaceView {
     const fov = 56 + clamp(target.v / 30, 0, 1) * 8 + (target.boosting ? 6 : 0)
     this.camera.fov += (fov - this.camera.fov) * Math.min(1, dt * 4)
     this.camera.updateProjectionMatrix()
+    this.renderer.toneMappingExposure = 1.02 + (this.reduced ? 0 : this.exposurePunch)
     this.sun.position.set(f.x + 24, f.y + 36, f.z + 12)
     this.sunTarget.position.set(f.x, f.y, f.z)
     this.fx?.classList.toggle('boost', !!target.boosting && target.isPlayer)
@@ -685,10 +775,17 @@ export class RaceView {
     for (const p of this.puffs) {
       if (p.life <= 0) continue
       p.life -= dt
-      p.mesh.position.y += dt * 1.4
+      const drag = Math.exp(-1.8 * dt)
+      p.vx *= drag
+      p.vy *= drag
+      p.vz *= drag
+      p.mesh.position.x += p.vx * dt
+      p.mesh.position.y += dt * (1.4 + p.vy)
+      p.mesh.position.z += p.vz * dt
+      if (p.spin) p.mesh.rotateZ(p.spin * dt)
       const mat = p.mesh.material as THREE.MeshBasicMaterial
-      mat.opacity = Math.max(0, (p.life / p.max) * 0.5)
-      p.mesh.scale.multiplyScalar(1 + dt * 0.8)
+      mat.opacity = Math.max(0, (p.life / p.max) * (p.hot ? 0.95 : 0.5))
+      p.mesh.scale.multiplyScalar(1 + dt * (p.hot ? 0.45 : 0.8))
       if (p.life <= 0) p.mesh.visible = false
     }
     for (const s of this.skids) {
@@ -700,9 +797,18 @@ export class RaceView {
     }
     const c = this.sim.countdown
     const lit = !this.sim.started ? (c > 2 ? 0 : c > 1 ? 1 : c > 0 ? 2 : 3) : 3
-    const pulse = 0.82 + Math.sin(this.sim.time * 7) * 0.18
-    for (const mat of this.padMats) mat.color.setRGB(0.84 * pulse, 1 * pulse, 0.23 * pulse)
-    for (const sign of this.padSigns) sign.scale.set(8.4 * pulse, 4.2 * pulse, 1)
+    if (this.padFlash > 0) this.padFlash = Math.max(0, this.padFlash - dt)
+    this.padMats.forEach((mat, i) => {
+      const hot = this.padFlash > 0 && i + 1 === this.hotPad
+      const pulse = hot ? 1.35 + Math.sin(this.sim.time * 28) * 0.45 : 0.82 + Math.sin(this.sim.time * 7) * 0.18
+      mat.color.setRGB(0.84 * pulse, 1 * pulse, 0.23 * pulse)
+    })
+    this.padSigns.forEach((sign, i) => {
+      const hot = this.padFlash > 0 && i + 1 === this.hotPad
+      const pulse = hot ? 1.15 + Math.sin(this.sim.time * 28) * 0.2 : 0.82 + Math.sin(this.sim.time * 7) * 0.18
+      const boom = hot ? 1.55 : 1
+      sign.scale.set(8.4 * pulse * boom, 4.2 * pulse * boom, 1)
+    })
     this.lamps.forEach((lamp, i) => {
       const mat = lamp.material as THREE.MeshStandardMaterial
       const on = this.sim.started ? true : i < lit

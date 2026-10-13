@@ -62,6 +62,9 @@ type RaceResult = {
   points: number
 }
 
+const BUILD = 'send-punch-2026-10-13'
+console.info(`SKETCH SEND ${BUILD}`)
+
 const CUP_TRACKS = ['quill', 'blotter', 'margin']
 const POINTS = [10, 7, 5, 3, 2, 1]
 
@@ -749,7 +752,7 @@ function onRaceEvent(e: SimEvent) {
   if (e.type === 'hit') audio.hit()
   if (e.type === 'pad') {
     audio.pad()
-    flashBanner('SEND')
+    flashBanner('SEND', 'send')
   }
   if (e.type === 'hazard') {
     if (e.kind === 'slick') audio.slick()
@@ -814,15 +817,20 @@ function flashCount(text: string, go: boolean) {
   if (go) audio.count(0)
 }
 
-function flashBanner(text: string) {
+function flashBanner(text: string, flavor: 'plain' | 'send' = 'plain') {
   const el = document.querySelector('#banner')
   if (!el) return
   el.textContent = text
+  el.classList.toggle('send', flavor === 'send')
   el.classList.remove('pop')
   void (el as HTMLElement).offsetWidth
   el.classList.add('pop')
   window.clearTimeout(bannerTimer)
-  bannerTimer = window.setTimeout(() => el.classList.remove('pop'), 900)
+  const hold = flavor === 'send' ? 420 : 900
+  bannerTimer = window.setTimeout(() => {
+    el.classList.remove('pop')
+    if (flavor === 'send') el.classList.remove('send')
+  }, hold)
 }
 
 function togglePause(force?: boolean) {

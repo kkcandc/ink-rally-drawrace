@@ -35,7 +35,7 @@ export type SimEvent =
   | { type: 'go' }
   | { type: 'lap'; lap: number }
   | { type: 'finish' }
-  | { type: 'pad' }
+  | { type: 'pad'; id: number }
   | { type: 'hit' }
   | { type: 'boost' }
   | { type: 'drift' }
@@ -495,7 +495,7 @@ function stepRacer(sim: Sim, r: SimRacer, dt: number, input: Input) {
       r.lastPad = pad
       r.v = Math.min(r.stats.topSpeed * 1.22, r.v + TUNE.padKick)
       r.boost = Math.min(1, r.boost + TUNE.padBoost)
-      if (r.isPlayer) sim.events.push({ type: 'pad' })
+      if (r.isPlayer) sim.events.push({ type: 'pad', id: pad })
     }
   } else {
     r.offPad += r.v * dt
