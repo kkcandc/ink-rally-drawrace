@@ -62,8 +62,8 @@ type RaceResult = {
   points: number
 }
 
-const BUILD = 'send-punch-2026-10-13'
-console.info(`SKETCH SEND ${BUILD}`)
+const BUILD = 'edge-smash-2026-10-23'
+console.info(`build: ${BUILD}`)
 
 const CUP_TRACKS = ['quill', 'blotter', 'margin']
 const POINTS = [10, 7, 5, 3, 2, 1]
@@ -749,7 +749,10 @@ function onRaceEvent(e: SimEvent) {
     flashBanner(`LAP ${e.lap + 1}`)
   }
   if (e.type === 'finish') finishRace()
-  if (e.type === 'hit') audio.hit()
+  if (e.type === 'hit') {
+    audio.hit()
+    flashBanner('EDGE', 'edge')
+  }
   if (e.type === 'pad') {
     audio.pad()
     flashBanner('SEND', 'send')
@@ -817,19 +820,21 @@ function flashCount(text: string, go: boolean) {
   if (go) audio.count(0)
 }
 
-function flashBanner(text: string, flavor: 'plain' | 'send' = 'plain') {
+function flashBanner(text: string, flavor: 'plain' | 'send' | 'edge' = 'plain') {
   const el = document.querySelector('#banner')
   if (!el) return
   el.textContent = text
   el.classList.toggle('send', flavor === 'send')
+  el.classList.toggle('edge', flavor === 'edge')
   el.classList.remove('pop')
   void (el as HTMLElement).offsetWidth
   el.classList.add('pop')
   window.clearTimeout(bannerTimer)
-  const hold = flavor === 'send' ? 420 : 900
+  const hold = flavor === 'send' ? 420 : flavor === 'edge' ? 760 : 900
   bannerTimer = window.setTimeout(() => {
     el.classList.remove('pop')
     if (flavor === 'send') el.classList.remove('send')
+    if (flavor === 'edge') el.classList.remove('edge')
   }, hold)
 }
 

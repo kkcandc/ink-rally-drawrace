@@ -87,6 +87,9 @@ export class RaceView {
   private hazards: HazardActor[] = []
   private fxTimer = 0
   private sendTimer = 0
+  private edgeTimer = 0
+  private hitStop = 0
+  private jolt = 0
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -175,7 +178,8 @@ export class RaceView {
     window.removeEventListener('resize', this.onResize)
     window.clearTimeout(this.fxTimer)
     window.clearTimeout(this.sendTimer)
-    this.fx?.classList.remove('boost', 'hit', 'slick', 'sticky', 'cone', 'sweeper', 'send')
+    window.clearTimeout(this.edgeTimer)
+    this.fx?.classList.remove('boost', 'hit', 'slick', 'sticky', 'cone', 'sweeper', 'send', 'rip')
     disposeObject(this.scene)
     this.renderer.dispose()
   }
@@ -546,13 +550,19 @@ export class RaceView {
 
   private tick(dt: number) {
     const before = this.sim.events.length
-    if (!this.celebrating) stepSim(this.sim, dt, () => this.opts.getInput())
+    let simDt = dt
+    if (this.hitStop > 0 && !this.celebrating) {
+      this.hitStop = Math.max(0, this.hitStop - dt)
+      if (!this.reduced) simDt = dt * 0.22
+    }
+    if (!this.celebrating) stepSim(this.sim, simDt, () => this.opts.getInput())
     if (this.sim.events.length > before) {
       for (let i = before; i < this.sim.events.length; i++) {
         const event = this.sim.events[i]
         this.opts.onEvent(event)
         if (event.type === 'hazard') this.burstHazard(event.kind)
         if (event.type === 'pad') this.burstPad(event.id)
+        if (event.type === 'hit') this.smashEdge()
       }
     }
     this.sim.events.length = 0
@@ -564,7 +574,7 @@ export class RaceView {
     this.paintMinimap()
     const player = this.sim.racers.find((r) => r.isPlayer)
     if (player && this.sim.started && !player.finished) {
-      this.recordAcc += dt
+      this.recordAcc += simDt
       if (this.recordAcc >= 0.1) {
         this.recordAcc = 0
         this.ghostFrames.push({ p: progressOf(player, this.sim.track.length), x: player.x, h: player.heading })
@@ -609,6 +619,52 @@ export class RaceView {
     slot.mesh.rotateY(r.heading)
     const mat = slot.mesh.material as THREE.MeshBasicMaterial
     mat.opacity = 0.45
+  }
+
+  private smashEdge() {
+    const target = this.sim.racers.find((r) => r.isPlayer)
+    if (!target) return
+    const f = frameAt(this.sim.track, target.s, target.x)
+    const side = Math.sign(target.x || target.vx || 1) || 1
+    const count = this.reduced ? 7 : 18
+    for (let i = 0; i < count; i++) {
+      const shred = i % 3 !== 2
+      const slot = this.takePuff(!shred)
+      if (!slot) break
+      slot.life = slot.max = this.reduced ? 0.45 : 0.62 + Math.random() * 0.28
+      slot.mesh.visible = true
+      const along = (Math.random() - 0.5) * 1.4
+      const lift = 0.25 + Math.random() * 1.1
+      slot.mesh.position.set(
+        f.x + f.rx * side * (1.15 + Math.random() * 0.45) + f.tx * along,
+        f.y + lift,
+        f.z + f.rz * side * (1.15 + Math.random() * 0.45) + f.tz * along,
+      )
+      if (shred) {
+        slot.mesh.scale.set(1.3 + Math.random() * 2.1, 1, 0.7 + Math.random() * 1.2)
+        slot.mesh.rotation.set(Math.random() * 1.4, Math.random() * Math.PI, Math.random() * Math.PI)
+      } else {
+        slot.mesh.rotation.set(0, 0, 0)
+        slot.mesh.scale.setScalar(0.42 + Math.random() * 0.55)
+      }
+      const spray = this.reduced ? 0 : 5 + Math.random() * 9
+      slot.vx = this.reduced ? 0 : f.rx * side * spray + f.tx * (Math.random() - 0.5) * 4
+      slot.vy = this.reduced ? -1.4 : 2.2 + Math.random() * 6
+      slot.vz = this.reduced ? 0 : f.rz * side * spray + f.tz * (Math.random() - 0.5) * 4
+      slot.spin = this.reduced ? 0 : (Math.random() - 0.5) * 11
+      slot.hot = true
+      const mat = slot.mesh.material as THREE.MeshBasicMaterial
+      const paper = shred && Math.random() > 0.28
+      mat.color.set(paper ? '#f3ead7' : '#ef4b32')
+      mat.opacity = 0.95
+    }
+    this.fx?.classList.add('rip')
+    window.clearTimeout(this.edgeTimer)
+    this.edgeTimer = window.setTimeout(() => this.fx?.classList.remove('rip'), 320)
+    if (this.reduced) return
+    this.hitStop = 0.14
+    this.jolt = side
+    this.shake = Math.min(0.95, this.shake + 0.62)
   }
 
   private burstHazard(kind: HazardKind) {
@@ -736,21 +792,28 @@ export class RaceView {
       )
       lookAt = new THREE.Vector3(ahead.x, ahead.y + 1.3, ahead.z)
     }
+    const followDt = this.hitStop > 0 && !this.reduced ? dt * 0.35 : dt
     if (!this.ready) {
       this.camPos.copy(desired)
       this.look.copy(lookAt)
       this.ready = true
     } else {
-      const k = 1 - Math.exp(-3.4 * dt)
+      const k = 1 - Math.exp(-3.4 * followDt)
       this.camPos.lerp(desired, k)
       this.look.lerp(lookAt, k)
     }
     if (target.scraping && !this.reduced) this.shake = Math.min(0.35, this.shake + 0.12)
     this.shake *= Math.exp(-3.5 * dt)
     this.kick *= Math.exp(-9 * dt)
+    this.jolt *= Math.exp(-8 * dt)
     this.exposurePunch *= Math.exp(-10 * dt)
     this.camera.position.copy(this.camPos)
     if (!this.reduced && this.kick > 0.02) this.camera.position.y += this.kick * 1.15
+    if (!this.reduced && Math.abs(this.jolt) > 0.02) {
+      this.camera.position.x += f.rx * this.jolt * 1.35
+      this.camera.position.y += f.ry * this.jolt * 1.35
+      this.camera.position.z += f.rz * this.jolt * 1.35
+    }
     if (this.shake > 0.01 && !this.reduced) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake
       this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.6
