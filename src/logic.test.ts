@@ -220,4 +220,28 @@ describe('racing', () => {
       }
     }
   })
+
+  it('creases once on the frame a sled first meets the page edge', () => {
+    const track = getTrack('quill')
+    const stats = analyze(RIVALS[0].mask)
+    const sim = createRace({
+      track,
+      laps: 2,
+      skipCountdown: true,
+      rubber: false,
+      specs: [{ id: 'p', name: 'Driver', color: '#147a86', stats, isPlayer: true }],
+    })
+    const player = sim.racers[0]
+    player.s = 40
+    player.x = 20
+    player.vx = 8
+    player.v = 20
+    player.crossedOnce = true
+    stepSim(sim, 1 / 60, () => ({ steer: 0, brake: 0, drift: false, boost: false }))
+    expect(player.scraping).toBe(true)
+    expect(sim.events.filter((e) => e.type === 'hit')).toHaveLength(1)
+    sim.events.length = 0
+    stepSim(sim, 1 / 60, () => ({ steer: 0, brake: 0, drift: false, boost: false }))
+    expect(sim.events.some((e) => e.type === 'hit')).toBe(false)
+  })
 })

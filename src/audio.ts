@@ -59,7 +59,9 @@ export class AudioBus {
   }
 
   hit() {
-    this.env(90, 0.16, 'sawtooth', 0.06, -40)
+    this.env(220, 0.04, 'square', 0.07, -160)
+    this.env(96, 0.18, 'sawtooth', 0.07, -55)
+    this.env(520, 0.05, 'triangle', 0.03, -340)
   }
 
   slick() {
